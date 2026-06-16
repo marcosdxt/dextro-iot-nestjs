@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, Logger, Type } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger, Type, Inject } from '@nestjs/common';
 import { DiscoveryService, MetadataScanner, Reflector } from '@nestjs/core';
 import { 
     IOT_REMOTE_PROCEDURE_METADATA, 
@@ -9,6 +9,13 @@ export interface IotHandlerMetadata {
     type: string;
     methodName: string;
     instance: any;
+}
+
+export interface IotContext<TDevice = any> {
+    deviceId: string;
+    device: TDevice;
+    timestamp: Date;
+    metadata: any;
 }
 
 @Injectable()
@@ -22,6 +29,8 @@ export class MqttRouterService implements OnModuleInit {
         private readonly discoveryService: DiscoveryService,
         private readonly metadataScanner: MetadataScanner,
         private readonly reflector: Reflector,
+        @Inject('ICacheProvider') private readonly cache: any,
+        @Inject('IDeviceRepository') private readonly repository: any
     ) {}
 
     onModuleInit() {
@@ -70,7 +79,24 @@ export class MqttRouterService implements OnModuleInit {
             return { error: 'PROCEDURE_NOT_FOUND' };
         }
 
-        return await handler.instance[handler.methodName](deviceId, payload);
+        // 1. Resolve o Device (Cache -> Repo)
+        let device = await this.cache.get(`device:${deviceId}`);
+        if (!device) {
+            device = await this.repository.findOne(deviceId);
+            if (device) await this.cache.set(`device:${deviceId}`, JSON.stringify(device), 3600);
+        } else {
+            device = JSON.parse(device as string);
+        }
+
+        const context = {
+            deviceId,
+            device, // Objeto completo resolvido
+            timestamp: new Date(),
+            metadata: device?.metadata || {}
+        };
+
+        // 2. Chama o handler com payload tipado e contexto rico
+        return await handler.instance[handler.methodName](payload, context);
     }
 
     async routeInboxMessage(type: string, deviceId: string, payload: any): Promise<void> {
@@ -80,6 +106,21 @@ export class MqttRouterService implements OnModuleInit {
             return;
         }
 
-        await handler.instance[handler.methodName](deviceId, payload);
+        let device = await this.cache.get(`device:${deviceId}`);
+        if (!device) {
+            device = await this.repository.findOne(deviceId);
+            if (device) await this.cache.set(`device:${deviceId}`, JSON.stringify(device), 3600);
+        } else {
+            device = JSON.parse(device as string);
+        }
+
+        const context: IotContext = {
+            deviceId,
+            device,
+            timestamp: new Date(),
+            metadata: device?.metadata || {}
+        };
+
+        await handler.instance[handler.methodName](payload, context);
     }
 }

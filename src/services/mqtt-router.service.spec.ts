@@ -5,12 +5,12 @@ import { DiscoveryModule, DiscoveryService, MetadataScanner } from '@nestjs/core
 
 class MockAppService {
     @RemoteProcedure('get-status')
-    async getStatus(deviceId: string, payload: any) {
-        return { status: 'OK', deviceId };
+    async getStatus(payload: any, context: any) {
+        return { status: 'OK', deviceId: context.deviceId };
     }
 
     @InboxHandler('telemetry')
-    async handleTelemetry(deviceId: string, payload: any) {
+    async handleTelemetry(payload: any, context: any) {
         return { processed: true };
     }
 }
@@ -25,7 +25,9 @@ describe('MqttRouterService', () => {
             providers: [
                 MqttRouterService,
                 MetadataScanner,
-                MockAppService
+                MockAppService,
+                { provide: 'ICacheProvider', useValue: { get: jest.fn().mockResolvedValue(null), set: jest.fn() } },
+                { provide: 'IDeviceRepository', useValue: { findOne: jest.fn().mockResolvedValue({ id: 'DEV-123', metadata: { firmware: '1.0' } }) } }
             ],
         }).compile();
 
@@ -44,7 +46,10 @@ describe('MqttRouterService', () => {
     it('deve descobrir e rotear InboxHandlers decorados', async () => {
         const spy = jest.spyOn(appService, 'handleTelemetry');
         await service.routeInboxMessage('telemetry', 'DEV-123', { temp: 25 });
-        expect(spy).toHaveBeenCalledWith('DEV-123', { temp: 25 });
+        expect(spy).toHaveBeenCalledWith(
+            { temp: 25 },
+            expect.objectContaining({ deviceId: 'DEV-123', metadata: { firmware: '1.0' } })
+        );
     });
 
     it('deve retornar erro para procedimento não encontrado', async () => {
