@@ -16,7 +16,7 @@ describe('OutboxProvider', () => {
         } as any;
 
         repository = {
-            findOne: jest.fn(),
+            findOne: jest.fn().mockResolvedValue({ id: 'DEV-1' }),
             save: jest.fn(),
             updateStatus: jest.fn(),
         } as any;
@@ -31,6 +31,11 @@ describe('OutboxProvider', () => {
         }).compile();
 
         provider = module.get<OutboxProvider>(OutboxProvider);
+    });
+
+    it('deve rejeitar o push se o dispositivo não existir', async () => {
+        repository.findOne.mockResolvedValueOnce(null);
+        await expect(provider.push('DEV-INVALID', 'TEST', {})).rejects.toThrow('DeviceNotFoundError');
     });
 
     it('deve enfileirar mensagem e notificar device se não houver lock', async () => {

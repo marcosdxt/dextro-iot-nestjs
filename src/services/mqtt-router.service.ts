@@ -80,7 +80,12 @@ export class MqttRouterService implements OnModuleInit {
         let device = await this.cache.get(`device:${deviceId}`);
         if (!device) {
             device = await this.repository.findOne(deviceId);
-            if (device) await this.cache.set(`device:${deviceId}`, JSON.stringify(device), 3600);
+            if (device) {
+                await this.cache.set(`device:${deviceId}`, JSON.stringify(device), 3600);
+            } else {
+                this.logger.warn(`Mensagem ignorada: Dispositivo '${deviceId}' não encontrado.`);
+                return;
+            }
         } else {
             device = JSON.parse(device as string);
         }
@@ -104,7 +109,12 @@ export class MqttRouterService implements OnModuleInit {
         let device = await this.cache.get(`device:${deviceId}`);
         if (!device) {
             device = await this.repository.findOne(deviceId);
-            if (device) await this.cache.set(`device:${deviceId}`, JSON.stringify(device), 3600);
+            if (device) {
+                await this.cache.set(`device:${deviceId}`, JSON.stringify(device), 3600);
+            } else {
+                this.logger.warn(`Mensagem ignorada: Dispositivo '${deviceId}' não encontrado.`);
+                return;
+            }
         } else {
             device = JSON.parse(device as string);
         }

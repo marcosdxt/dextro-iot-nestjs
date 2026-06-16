@@ -24,6 +24,16 @@ export class OutboxProvider {
      * Enfileira uma mensagem para o dispositivo e notifica-o.
      */
     async push(deviceId: string, type: string, payload: any): Promise<string> {
+        // Validação de Existência do Destinatário
+        let device = await this.cache.get(`device:${deviceId}`);
+        if (!device) {
+            device = await this.repository.findOne(deviceId);
+            if (!device) {
+                throw new Error(`DeviceNotFoundError: O dispositivo '${deviceId}' não existe no repositório.`);
+            }
+            await this.cache.set(`device:${deviceId}`, JSON.stringify(device), 3600);
+        }
+
         const id = uuidv4();
         const message: OutboxMessage = { id, type, payload };
 
