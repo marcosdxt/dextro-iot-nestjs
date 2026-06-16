@@ -5,12 +5,12 @@ import { DiscoveryModule, DiscoveryService, MetadataScanner } from '@nestjs/core
 
 class MockAppService {
     @RemoteProcedure('get-status')
-    async getStatus(payload: any, context: any) {
-        return { status: 'OK', deviceId: context.deviceId };
+    async getStatus({ deviceId, payload, metadata }: any) {
+        return { status: 'OK', deviceId };
     }
 
     @InboxHandler('telemetry')
-    async handleTelemetry(payload: any, context: any) {
+    async handleTelemetry({ deviceId, payload, metadata }: any) {
         return { processed: true };
     }
 }
@@ -47,8 +47,11 @@ describe('MqttRouterService', () => {
         const spy = jest.spyOn(appService, 'handleTelemetry');
         await service.routeInboxMessage('telemetry', 'DEV-123', { temp: 25 });
         expect(spy).toHaveBeenCalledWith(
-            { temp: 25 },
-            expect.objectContaining({ deviceId: 'DEV-123', metadata: { firmware: '1.0' } })
+            expect.objectContaining({ 
+                deviceId: 'DEV-123', 
+                payload: { temp: 25 },
+                metadata: expect.objectContaining({ firmware: '1.0' })
+            })
         );
     });
 

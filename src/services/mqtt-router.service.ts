@@ -5,17 +5,15 @@ import {
     IOT_INBOX_HANDLER_METADATA 
 } from '../constants/iot.constants';
 
+export interface DextroIotMeta {
+    timestamp: Date;
+    [key: string]: any;
+}
+
 export interface IotHandlerMetadata {
     type: string;
     methodName: string;
     instance: any;
-}
-
-export interface IotContext<TDevice = any> {
-    deviceId: string;
-    device: TDevice;
-    timestamp: Date;
-    metadata: any;
 }
 
 @Injectable()
@@ -79,7 +77,6 @@ export class MqttRouterService implements OnModuleInit {
             return { error: 'PROCEDURE_NOT_FOUND' };
         }
 
-        // 1. Resolve o Device (Cache -> Repo)
         let device = await this.cache.get(`device:${deviceId}`);
         if (!device) {
             device = await this.repository.findOne(deviceId);
@@ -88,15 +85,13 @@ export class MqttRouterService implements OnModuleInit {
             device = JSON.parse(device as string);
         }
 
-        const context = {
-            deviceId,
-            device, // Objeto completo resolvido
+        const metadata: DextroIotMeta = {
             timestamp: new Date(),
-            metadata: device?.metadata || {}
+            ...device?.metadata
         };
 
-        // 2. Chama o handler com payload tipado e contexto rico
-        return await handler.instance[handler.methodName](payload, context);
+        // Assinatura Limpa: handler({ deviceId, payload, metadata })
+        return await handler.instance[handler.methodName]({ deviceId, payload, metadata });
     }
 
     async routeInboxMessage(type: string, deviceId: string, payload: any): Promise<void> {
@@ -114,13 +109,12 @@ export class MqttRouterService implements OnModuleInit {
             device = JSON.parse(device as string);
         }
 
-        const context: IotContext = {
-            deviceId,
-            device,
+        const metadata: DextroIotMeta = {
             timestamp: new Date(),
-            metadata: device?.metadata || {}
+            ...device?.metadata
         };
 
-        await handler.instance[handler.methodName](payload, context);
+        // Assinatura Limpa: handler({ deviceId, payload, metadata })
+        await handler.instance[handler.methodName]({ deviceId, payload, metadata });
     }
 }

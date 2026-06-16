@@ -38,16 +38,15 @@ export class AppModule {}
 O módulo resolve o dispositivo automaticamente (via `IDeviceRepository` e `ICacheProvider`) e o injeta junto com a mensagem, permitindo forte tipagem no payload.
 
 ```typescript
-import { IotContext, RemoteProcedure, InboxHandler } from 'dextro-iot-nestjs';
+import { DextroIotMeta, RemoteProcedure, InboxHandler } from 'dextro-iot-nestjs';
 
-// Exemplo de tipagem do Payload
-class ConfigRequestDto {
-  version: string;
-}
+class ConfigRequestDto { version: string; }
+class AccessLogDto { userId: string; action: string; }
 
-class AccessLogDto {
-  userId: string;
-  action: string;
+interface RpcContext<T> {
+  deviceId: string;
+  payload: T;
+  metadata: DextroIotMeta;
 }
 
 @Injectable()
@@ -55,21 +54,15 @@ export class LockerService {
   
   // O Device chama o Backend (Remote Procedure)
   @RemoteProcedure('get-config')
-  async handleGetConfig(payload: ConfigRequestDto, context: IotContext) {
-    console.log(`Device ID: ${context.deviceId}`);
-    console.log(`Hardware Version: ${context.metadata.hardwareVersion}`);
-    
-    // Retorna dados baseados no contexto do dispositivo
-    return { 
-      interval: context.device.premium ? 10 : 30, 
-      version: '1.0.2' 
-    };
+  async handleGetConfig({ deviceId, payload, metadata }: RpcContext<ConfigRequestDto>) {
+    console.log(`Hardware Version: ${metadata.hardwareVersion}`);
+    return { interval: 30, version: '1.0.2' };
   }
 
   // O Device envia dados garantidos (Inbox)
   @InboxHandler('access-log')
-  async handleAccessLog(payload: AccessLogDto, context: IotContext) {
-    console.log(`Acesso concedido a ${payload.userId} na porta do device ${context.deviceId}`);
+  async handleAccessLog({ deviceId, payload }: RpcContext<AccessLogDto>) {
+    console.log(`Acesso concedido a ${payload.userId} na porta do device ${deviceId}`);
   }
 }
 ```
